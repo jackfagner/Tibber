@@ -1,9 +1,10 @@
 """
-<plugin key="Tibber" name="Tibber 1.02" author="Processware" version="1.02" wikilink="https://github.com/me-processware/Tibber-Domoticz" externallink="">
+<plugin key="Tibber" name="Tibber 1.03" author="Processware" version="1.03" wikilink="https://github.com/me-processware/Tibber-Domoticz" externallink="">
     <description>
         <h2>Tibber API is used to fetch data from Tibber.com</h2><br/>
         <h3>Changelog</h3>
         <ul style="list-style-type:square">
+            <li>v1.03 - Fixed timezone bug. Added price multiplier</li>
             <li>v1.02 - Added configurable timezone support and improved price calculations</li>
             <li>v1.01 - Initial release</li>
         </ul>
@@ -46,13 +47,14 @@
                 <option label="No" value="No"/>
             </options>
         </param>
+        <param field="Mode2" label="Price multiplier" width="75px" required="false" default="1"/>
         <param field="Mode6" label="Enable Logging" width="75px">
             <options>
                 <option label="Yes" value="Yes" default="true"/>
                 <option label="No" value="No"/>
             </options>
         </param>
-        <param field="Mode7" label="Timezone" width="200px">
+        <param field="Mode3" label="Timezone" width="200px">
             <options>
                 <option label="Europe/Amsterdam" value="Europe/Amsterdam" default="true"/>
                 <option label="Europe/London" value="Europe/London"/>
@@ -135,8 +137,16 @@ class BasePlugin:
         self.HomeID = Parameters["Mode4"]
         self.CreateRealTime = Parameters["Mode5"]
         self.EnableLogging = Parameters["Mode6"]
-        # Set default timezone if Mode7 is not available
-        self.Timezone = Parameters.get("Mode7", "Europe/Amsterdam")
+        # Set default timezone if Mode3 is not available
+        self.Timezone = Parameters.get("Mode3", "Europe/Amsterdam")
+        #Domoticz.Log(f"Selected timezone: {self.Timezone}")
+        self.PriceMultiplier = 1
+
+        try:
+            float(Parameters["Mode2"])
+            self.PriceMultiplier = float(Parameters["Mode2"])
+        except:
+            Domoticz.Log("The price multiplier is not a number")
 
         self.headers = {
             'Host': 'api.tibber.com',
@@ -300,15 +310,15 @@ class BasePlugin:
                 max_price = max((price['total'] for price in today_prices), default=0)
 
                 # Update devices with the fetched price information
-                UpdateDevice('Current Price', round(price_info['current']['total'], 3))
-                UpdateDevice('Mean Price', round(mean_price, 3))
-                UpdateDevice('Current Price excl. fee', round(price_info['current']['energy'], 3))
-                UpdateDevice('Minimum Price', round(min_price, 3))
-                UpdateDevice('Maximum Price', round(max_price, 3))
+                UpdateDevice('Current Price', round(price_info['current']['total'] * self.PriceMultiplier, 4))
+                UpdateDevice('Mean Price', round(round(mean_price, 4) * self.PriceMultiplier, 4))
+                UpdateDevice('Current Price excl. fee', round(price_info['current']['energy'] * self.PriceMultiplier, 4))
+                UpdateDevice('Minimum Price', round(min_price * self.PriceMultiplier, 4))
+                UpdateDevice('Maximum Price', round(max_price * self.PriceMultiplier, 4))
 
                 # Check if data for tomorrow is available
                 if price_info['tomorrow']:
-                    UpdateDevice('Tomorrow Price', round(price_info['tomorrow'][0]['total'], 3))
+                    UpdateDevice('Tomorrow Price', round(price_info['tomorrow'][0]['total'] * self.PriceMultiplier, 4))
 
             else:
                 Domoticz.Error(f"Error fetching price information: {response.status_code}, {response.text}")
