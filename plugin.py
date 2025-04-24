@@ -405,6 +405,7 @@ class BasePlugin:
                 
         except Exception as e:
             Domoticz.Error(f"WebSocket error during async operation: {str(e)}")
+            time.sleep(250)  # Quick fix, delay reconnect
             self.loop.stop()  # Stop the event loop on error
 
     def handle_reconnect(self):
